@@ -1,0 +1,61 @@
+task_id: pm-runtime-communication-substrate-mvp
+task_domain: pm-runtime-governance
+short_task: communication-substrate-mvp
+task_level: M
+executor_type: local_echo
+execution_mode: local_echo
+owner_control_required: true
+runtime_allowed_level: L1
+
+paths:
+  task_dir: audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox/demo_task
+  dispatch_path: audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox/demo_task/dispatch/task_config.yaml
+  system_prompt_path:
+  # v0.1.2: external_dispatch_path — if set, init copies this file to <task_dir>/dispatch/dispatch.md
+  # so the executor can read it within the sandbox without external path permissions.
+  external_dispatch_path:
+  runtime_dir: audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox/demo_task/runtime
+  logs_dir: audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox/demo_task/logs
+  summary_path: audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox/demo_task/summary/pm_runtime_summary.md
+
+runtime_control:
+  mode: health_based
+  heartbeat_interval_sec: 30
+  progress_check_interval_sec: 120
+  no_heartbeat_timeout_sec: 300
+  no_progress_review_sec: 600
+  owner_review_after_sec: 1800
+  emergency_max_wall_time_sec:
+  abort_requires_owner: true
+  preserve_partial_output_on_abort: true
+
+scope:
+  allowed_files: []
+  forbidden_files: []
+  allowed_dirs:
+    - audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox
+  sandbox_dir: audit/tasks/active/pm-runtime-governance/communication-substrate-mvp/sandbox
+
+executor_options:
+  sandbox_mode: workspace-write
+  allowed_tools: []
+  max_turns:
+  extra_args: []
+  expected_receipt_path:
+  expected_report_path:
+  command:
+    - local_echo
+  echo_stdout: PM Runtime local_echo demo stdout
+  echo_stderr: PM Runtime local_echo demo stderr
+
+# v0.1.1 managed subprocess example:
+# executor_type: shell_command
+# execution_mode: managed_subprocess
+# runtime_control:
+#   heartbeat_interval_sec: 1
+#   progress_check_interval_sec: 2
+# executor_options:
+#   command:
+#     - /path/to/python
+#     - -c
+#     - "import time,sys; print('start'); sys.stdout.flush(); time.sleep(3); print('done')"

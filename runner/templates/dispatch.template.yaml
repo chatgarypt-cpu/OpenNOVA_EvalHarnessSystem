@@ -1,0 +1,67 @@
+# =============================================================================
+# Adarian Workflow v4.0 — Dispatch Template
+# 来源: workflow_core_v4.0_r2.md §5.2
+# 用途: Control Agent / PM Runtime 填写后生成任务书，交给 DS Team / Codex / PM Runtime 执行
+# 状态: proposed → Owner 审批 → approved → PM Runtime 执行
+# =============================================================================
+
+# ── 基础字段（所有执行者必填）──────────────────────────────────────────────
+
+task_id: ""               # 格式: v<version>-<keyword>-<seq>，如 v1.2.9-report-decoupling-01
+task_title: ""            # 完整中文任务标题
+task_date: ""             # YYYY-MM-DD
+task_type: ""             # 任务类型: ds_pre_audit | ds_post_execution_review | codex_attempt | pm_runtime_relay | external_agent
+owner: ""                 # Owner 标识
+executor: ""              # 执行者: ds_team | codex | pm_runtime | external_agent
+
+status: proposed          # proposed | approved | running | completed | failed | hold
+created_at: ""            # ISO 时间戳，如 2026-05-22T18:00:00+08:00
+
+goal: ""                  # 任务目标，简洁明确
+scope: ""                 # 任务范围说明
+
+allowed_actions:          # 允许的操作
+  - ""
+forbidden_actions:        # 禁止的操作
+  - ""
+allowed_read_paths:       # 允许读取的文件/目录
+  - ""
+allowed_write_paths:      # 允许写入的文件/目录
+  - ""
+
+expected_outputs:         # 期望产出物（文件路径或描述）
+  - ""
+acceptance_criteria:      # 验收标准
+  - ""
+failure_policy: "失败后 HOLD，不允许自动扩大权限，不允许自动改任务范围。"
+
+# ── 按 executor 补充字段（选填对应的一组）─────────────────────────────────
+
+# --- 如果 executor == ds_team ---
+# team_mode_required: true
+# mcp_required: true
+# report_required: true
+# receipt_required: true
+
+# --- 如果 executor == codex ---
+# allowed_files:           # Codex 允许修改的精确文件列表
+#   - ""
+# forbidden_files:         # Codex 禁止触碰的文件列表
+#   - ""
+# required_commands:       # 执行后必须运行的检查命令
+#   - ""
+# diff_report_required: true
+
+# --- 如果 executor == pm_runtime ---
+# runtime_allowed_level: L2   # L0: 只读监控, L1: 通讯修复, L2: 同权限重试, L3: 需Owner重新批准
+# heartbeat_required: true
+# progress_required: true
+# result_required: true
+# receipt_required: true
+
+# ── 审批记录（Owner 审批后填写）───────────────────────────────────────────
+# approval:
+#   approved_by: ""
+#   approved_at: ""
+#   approval_mode: a0_manual_single_task   # a0: 手动单任务, a1: 低风险自动, a2: 端到端执行包
+#   notes: ""

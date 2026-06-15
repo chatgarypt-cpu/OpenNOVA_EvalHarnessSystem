@@ -1,0 +1,412 @@
+# Adarian Memory Governance — memory_registry.yaml
+# 机器可读索引 / Scope 定义的唯一主源
+# 用途：记录记忆层级、scope 分区、外部模块、写权限
+# 主源声明：本文件是 scope 信息的唯一主源。scopes/*.yaml 不冗余存储，如需独立文件则从本文件生成。
+
+version: "0.3"
+schema_version: "1.0"
+registry_name: "adarian_memory_governance"
+owner: "Gary"
+primary_runtime: "Hermes"
+status: "mvp"
+created: "2026-05-25"
+last_updated: "2026-06-03"
+primary_source: "memory_registry.yaml"
+version_history:
+  - version: "0.3.2"
+    date: "2026-06-03"
+    author: "Hermes"
+    summary: "Scope-recall 激活确认、容量扩容、L3 降维、Hook gate 落地、分层检索协议定型"
+    changes:
+      - "Scope-recall provider status promoted to active (333 entries, SQLite + FTS5, on-demand retrieval)"
+      - "Native memory char_limit: 22000→60000, user_char_limit: 14000→42000"
+      - "L3 global memory 降维：仅保留架构指针 + 分层检索协议，其余移入 scope-recall"
+      - "新增 Hook gate 规则：写 memory 必须用户确认（skill activation gate > 字段硬检查）"
+      - "新增分层检索协议：Native→Scope-recall→Handoff→Session search"
+      - "新增 memory_audit_skill v0.3（审计 + 清理 + 归档 + Hook Gate）"
+
+  - version: "0.2"
+    date: "2026-05-25"
+    author: "DS Agent Team"
+    summary: "Post-DS-audit revision"
+    changes:
+      - "Add cleanup/archive/rollback rules (§7.3)"
+      - "Add scope promotion (B->A) rules (§7.4)"
+      - "Add contamination_policy runtime behavior definitions (§7.5; strict/controlled/isolated)"
+      - "Unify Mermaid conflict diagram with YAML resolution order; add handoff freshness decay"
+      - "Unify scope entry fields (write_restrictions); add coursework/general scope"
+      - "Align directory path to actual filesystem (WorkflowBase/ not assets/)"
+      - "Add Hermes write operation tiers (routine/restricted/forbidden) + Claude Code proxy clause"
+      - "Add L2 degradation_strategy (fallback when scope_recall unavailable)"
+      - "Complete handoff required_fields (handoff_id + last_updated)"
+      - "Rewrite §14 Hermes execution Prompt to align with all revisions"
+      - "Expand acceptance criteria from 10 to 15 items"
+
+  - version: "0.2.1"
+    date: "2026-05-25"
+    author: "Hermes (PM Runtime)"
+    summary: "Hermes Supplement Patch: scope-recall downgrade, Workspace Router chain, huihua-handoff rename, config/actual mismatch"
+    changes:
+      - "Absorb runtime fact findings from tmux Claude Team 5-agent audit appendix A"
+      - "Downgrade scope-recall from workspace-scoped memory router to optional scoped recall storage backend"
+      - "Add Workspace Router responsibility chain (memory_registry + Hermes + huihua-handoff + optional scope-recall + future plugin)"
+      - "Rename session_handoff_skill to huihua-handoff; set status to active"
+      - "Record scope-recall config/actual mismatch (configured: scope-recall, actual: native_memory) and fallback provider"
+      - "Correct scope-recall positioning in §14 execution Prompt and §15 MVP closeout criteria"
+      - "Register scope-recall actual capability in external_modules table (SQLite + FTS5, no built-in routing)"
+
+  - version: "0.3.1"
+    date: "2026-05-29"
+    author: "Hermes"
+    summary: "检索协议 v2 同步：L4 session_search 重构落盘，新增 retrieval_protocol.yaml"
+    changes:
+      - "Update L4 description with fast/summary/guided mode details"
+      - "Add features, config_path, default_mode, retrieval_protocol ref to L4"
+      - "Add retrieval_protocol.yaml with 4-layer retrieval routing"
+      - "Add cross_reference to retrieval_protocol in handoff_policy.yaml"
+      - "Update HOWTO.md §0 and §1.A to reflect layered retrieval order"
+      - "Update README.md with retrieval protocol references"
+      - "Config set: auxiliary.session_search.default_mode = fast"
+    date: "2026-05-26"
+    author: "Hermes"
+    summary: "Handoff write protection protocol: auto-archive, merge, policy corrections, README sync"
+    changes:
+      - "Create handoff-writer.py (~/.hermes/scripts/) — read→archive→merge→write four-step protocol for all handoff writes"
+      - 'Create auto-archive: every handoff write INSERTs old version to WorkflowBase/memory/handoff/handoffs.db (SQLite, append-only)'
+      - "Fix handoff lifecycle: remove 7-day TTL/expiry. Handoffs never expire. Only closeout tasks go to archive/"
+      - "Fix handoff purpose: add historical_timeline (not just cross-session continuity)"
+      - "Register handoff-loader.py, handoff-writer.py, and hooks system in external_modules"
+      - "Update README §2 (hooks active, handoff auto-loaded), §5 (new lifecycle/write-protection), §13 (remove expiry)"
+      - "Audit finding: README was out of sync with actual state — resolved"
+
+principles:
+  - "Global memory must stay clean."
+  - "Scope memory isolates project and workflow contexts."
+  - "Handoff is a cross-session continuity layer, not long-term memory."
+  - "Search provides evidence, not authority."
+  - "External plugins may remain external, but must be registered."
+
+write_permissions:
+  allowed:
+    - "owner"
+    - "hermes"
+  denied_by_default:
+    - "ds_team"
+    - "codex"
+    - "claude_code"
+    - "external_agents"
+  hermes_operation_tiers:
+    routine:
+      description: "May execute autonomously"
+      actions:
+        - "Update session handoff"
+        - "Record memory audit results"
+        - "Update registry TO_BE_FILLED fields when path confirmed"
+        - "Update last_updated timestamps"
+    restricted:
+      description: "Requires Owner confirmation"
+      actions:
+        - "Add or modify scope definitions"
+        - "Modify external module registrations"
+        - "Execute scope promotion (B to A)"
+        - "Execute scope archiving"
+    forbidden:
+      description: "Absolute prohibition"
+      actions:
+        - "Modify write_permissions field"
+        - "Modify conflict_resolution_order"
+        - "Modify principles"
+        - "Modify contamination_policy_definitions"
+
+contamination_policy_definitions:
+  strict:
+    description: "Strict isolation"
+    write: "Only by Owner direct instruction or Hermes within scope context"
+    read: "Default: no cross-scope reads (except Global Memory)"
+    cross_scope_write: "Forbidden"
+    written_by_other_scopes: "Forbidden (explicit whitelist excepted)"
+    applies_to:
+      - "adarian/main_governance"
+      - "adarian/memory_governance"
+  controlled:
+    description: "Controlled access"
+    write: "Hermes may write within task context; record operations in handoff"
+    read: "May read related scopes (declare borrowing purpose in handoff)"
+    cross_scope_write: "Requires Owner confirmation"
+    applies_to:
+      - "workflow/hermes_pm_runtime"
+  isolated:
+    description: "Full isolation"
+    write: "Current scope context only. Writing to any other scope forbidden."
+    read: "Global Memory + current scope only. Reading other scope memory forbidden."
+    cross_scope_write: "Forbidden (includes Adarian, workflow, workyb, and all other scopes)"
+    applies_to:
+      - "ai_creative_publishing/coursework"
+      - "toolchain/local_environment"
+      - "coursework/general"
+
+memory_layers:
+  - layer_id: "L0_runtime_context"
+    layer_name: "Runtime Context"
+    purpose: "Current conversation context."
+    storage_location: "active session"
+    authority_level: 90
+    lifecycle: "ephemeral"
+
+  - layer_id: "L1_session_handoff"
+    layer_name: "Session Handoff"
+    purpose: "Cross-session continuity, context handoff, and historical timeline archive."
+    storage_location: 'WorkflowBase/memory/handoff/.session_handoff.md (current state) + handoffs.db (SQLite history)'
+    authority_level: 80
+    lifecycle: "continuity"
+    read_trigger: "new session or explicit handoff load (auto-loaded via pre_llm_call hook)"
+    write_trigger: "session closeout or explicit owner/hermes update (via handoff-writer.py, auto-archives old version)"
+    freshness_decay_days: 7
+    freshness_decay_penalty: 10
+
+  - layer_id: "L2_scope_memory"
+    layer_name: "Scope Memory"
+    purpose: "Project/workflow partition recall storage."
+    storage_location: "native memory or external configured provider"
+    registry_location: "WorkflowBase/memory/memory_registry.yaml"
+    authority_level: 70
+    lifecycle: "scope-bound"
+    degradation_strategy: |
+      When scope_recall_provider is unavailable:
+      1. Fall back to Global Memory (L3) for user preferences and general facts.
+      2. Fall back to Session Handoff (L1) for current task continuity.
+      3. Scope-specific memories are not retrievable until provider is restored.
+      4. Log degradation event in audits/ with timestamp and reason.
+      5. If degradation persists > 3 sessions, prompt Owner to investigate.
+
+  - layer_id: "L3_global_memory"
+    layer_name: "Global Memory"
+    purpose: "Stable user preferences and long-term general facts."
+    storage_location: "native memory"
+    authority_level: 60
+    lifecycle: "long-term"
+
+  - layer_id: "L4_session_search"
+    layer_name: "Session Search / Historical Recall"
+    purpose: "Historical evidence retrieval — fast mode (FTS5, 0 LLM token) 优先，summary/guided 仅深度理解时使用。"
+    storage_location: "native session search or external recall index"
+    authority_level: 40
+    lifecycle: "historical"
+    features:
+      - "fast — 纯 FTS5 查询，零 LLM 成本，适用闪电召回"
+      - "summary — auxiliary LLM 总结匹配会话"
+      - "guided — multi-anchor 钻取 + bookends（起止边界）+ match_message_id 精确定位"
+    config_path: "auxiliary.session_search.default_mode"
+    default_mode: "fast"
+    retrieval_protocol: "详见 retrieval_protocol.yaml priority 2 (fast) / priority 4 (summary/guided)"
+
+  - layer_id: "L5_external_plugins"
+    layer_name: "External Native Plugins"
+    purpose: "Native or external memory plugins that cannot be moved into workyb."
+    storage_location: "external"
+    authority_level: 30
+    lifecycle: "external"
+
+conflict_resolution_order:
+  - "current_owner_instruction"
+  - "current_session_confirmed_context"
+  - "session_handoff"
+  - "formal_dispatch_receipt_report"
+  - "scope_memory"
+  - "global_memory"
+  - "session_search_evidence"
+  - "model_impression"
+on_insufficient_evidence: "hold_and_escalate"
+
+scopes:
+  - scope_key: "adarian/main_governance"
+    project_id: "adarian"
+    lane_id: "main_governance"
+    description: "Adarian formal project governance and engineering workflow."
+    contamination_policy: "strict"
+    may_read_global_memory: true
+    may_read_other_scopes_by_default: false
+    write_restrictions:
+      - "coursework/general"
+      - "ai_creative_publishing/coursework"
+      - "toolchain/local_environment"
+    status: "active"
+    created: "2026-05-25"
+    last_updated: "2026-05-25"
+    line: "A"
+
+  - scope_key: "adarian/memory_governance"
+    project_id: "workyb"
+    lane_id: "memory_governance"
+    description: "Memory governance, handoff, scope recall, plugin registry. Governance scope: requires visibility into all scopes for audit."
+    contamination_policy: "strict"
+    may_read_global_memory: true
+    may_read_other_scopes_by_default: true
+    write_restrictions: []
+    status: "active"
+    created: "2026-05-25"
+    last_updated: "2026-05-25"
+    line: "A"
+
+  - scope_key: "workflow/hermes_pm_runtime"
+    project_id: "workflow"
+    lane_id: "hermes_pm_runtime"
+    description: "Hermes, PM Runtime, Control Agent workflow design."
+    contamination_policy: "controlled"
+    may_read_global_memory: true
+    may_read_other_scopes_by_default: false
+    write_restrictions:
+      - "adarian/main_governance"
+    status: "active"
+    created: "2026-05-25"
+    last_updated: "2026-05-25"
+    line: "A"
+
+  - scope_key: "ai_creative_publishing/coursework"
+    project_id: "ai_creative_publishing"
+    lane_id: "coursework"
+    description: "AI Creative Publishing coursework and deliverables."
+    contamination_policy: "isolated"
+    may_read_global_memory: true
+    may_read_other_scopes_by_default: false
+    write_restrictions:
+      - "adarian/main_governance"
+      - "adarian/memory_governance"
+      - "workflow/hermes_pm_runtime"
+    status: "active"
+    created: "2026-05-25"
+    last_updated: "2026-05-25"
+    line: "B"
+
+  - scope_key: "toolchain/local_environment"
+    project_id: "toolchain"
+    lane_id: "local_environment"
+    description: "Mac, Claude Code, Codex, local environment troubleshooting."
+    contamination_policy: "isolated"
+    may_read_global_memory: true
+    may_read_other_scopes_by_default: false
+    write_restrictions:
+      - "adarian/main_governance"
+      - "workflow/hermes_pm_runtime"
+    status: "active"
+    created: "2026-05-25"
+    last_updated: "2026-05-25"
+    line: "infra"
+
+  - scope_key: "coursework/general"
+    project_id: "coursework"
+    lane_id: "general"
+    description: "General coursework, papers, assignments."
+    contamination_policy: "isolated"
+    may_read_global_memory: true
+    may_read_other_scopes_by_default: false
+    write_restrictions:
+      - "adarian/main_governance"
+      - "adarian/memory_governance"
+      - "workflow/hermes_pm_runtime"
+    status: "active"
+    created: "2026-05-25"
+    last_updated: "2026-05-25"
+    line: "B"
+
+external_modules:
+  - module_id: "scope_recall_provider"
+    module_type: "scoped_recall_storage_backend"
+    runtime_status: "active"
+    maintenance_status: "stable"
+    actual_capability: "SQLite + FTS5 storage/retrieval backend; 333 memories captured; on-demand retrieval"
+    routing_capability: false
+    fallback_module: "native_memory"
+    source_location: "~/.hermes/plugins/scope-recall/"
+    config_location: "~/.hermes/config.yaml -> memory.provider: scope-recall"
+    config_actual_mismatch: false
+    actual_provider: "scope-recall (local, active)"
+    configured_provider: "scope-recall"
+    storage_location: "~/.hermes/scope-recall/ (memory.sqlite3 + lancedb)"
+    purpose: "On-demand memory retrieval via SQLite + FTS5. Activated and verified 2026-06-03."
+    notes: "Active. Hermes memory status confirms: installed ✓, available ✓, active ←."
+    last_verified: "2026-06-03"
+    last_verified_method: "hermes memory status + SQLite inspection"
+
+  - module_id: "native_memory"
+    module_type: "native_memory"
+    status: "active"
+    source_location: "native/system"
+    config_location: "built-in, no explicit config path"
+    purpose: "Stable global memory (fallback for scope-recall provider)."
+    last_verified: "2026-05-25"
+
+  - module_id: "session_search"
+    module_type: "historical_search"
+    status: "active"
+    source_location: "native/system"
+    config_location: "auxiliary.session_search (built-in)"
+    purpose: "Historical evidence retrieval — default_mode: fast (FTS5, 0 LLM token)."
+    features:
+      - "fast: zero-LLM FTS5 recall"
+      - "summary: auxiliary LLM summarization"
+      - "guided: multi-anchor drill-down with bookends + match_message_id"
+    retrieval_protocol: "retrieval_protocol.yaml — priority 2 (fast) / priority 4 (summary/guided)"
+    last_verified: "2026-05-29"
+
+  - module_id: "huihua_handoff_skill"
+    module_type: "skill"
+    runtime_status: "active"
+    maintenance_status: "stable"
+    source_location: "~/.hermes/skills/session-handoff/huihua-handoff/SKILL.md"
+    config_location: "~/.hermes/config.yaml -> skills.external_dirs (currently empty)"
+    purpose: "Cross-session context handoff (renamed from session_handoff_skill)."
+    notes: "active means skill definition is available, NOT that new sessions auto-trigger. Auto-trigger still depends on prefill/plugin/hook."
+    last_verified: "2026-05-25"
+
+  - module_id: "prefill_messages_file"
+    module_type: "config_setting"
+    status: "inactive"
+    source_location: "~/.hermes/config.yaml"
+    config_location: "prefill_messages_file: '' (currently empty)"
+    purpose: "Potential hook for auto-handoff-check at session start."
+    notes: "Currently empty. If enabled, could auto-trigger handoff file search. Requires testing."
+    last_verified: "2026-05-25"
+
+  - module_id: "handoff_loader_hook"
+    module_type: "shell_hook"
+    runtime_status: "active"
+    maintenance_status: "stable"
+    source_location: "~/.hermes/scripts/handoff-loader.py"
+    config_location: "~/.hermes/config.yaml -> hooks.pre_llm_call"
+    purpose: "Auto-load .session_handoff.md at new session start. Registered as pre_llm_call hook."
+    notes: "Fires on first LLM call of each session. Searches PWD + 3 parent dirs for .session_handoff.md, injects content as first user message context."
+    last_verified: "2026-05-26"
+
+  - module_id: "handoff_writer_script"
+    module_type: "shell_script"
+    runtime_status: "active"
+    maintenance_status: "stable"
+    source_location: "~/.hermes/scripts/handoff-writer.py"
+    purpose: "Write .session_handoff.md with read→archive→merge→write four-step protocol. Prevents accidental overwrite."
+    notes: "MANDATORY for all handoff writes. Auto-archives old version to WorkflowBase/memory/handoffs/ before merge."
+    last_verified: "2026-05-26"
+
+  - module_id: "hooks_system_pre_llm_call"
+    module_type: "config_system"
+    runtime_status: "active"
+    maintenance_status: "stable"
+    source_location: "~/.hermes/config.yaml -> hooks"
+    config_location: "hooks.pre_llm_call: [handoff-loader.py]"
+    purpose: "Hermes hook system. Enables pre_llm_call event trigger."
+    notes: "hooks_auto_accept: true. Currently only one hook registered (handoff-loader). Can be extended with more hooks."
+    last_verified: "2026-05-26"
+
+audit:
+  audit_skill_path: "WorkflowBase/memory/skills/memory_audit_skill.md"
+  trigger: "prompt_triggered"
+  interval: "on_demand"
+  checks:
+    - "scope contamination"
+    - "registry/readme consistency"
+    - "external module path drift"
+    - "handoff freshness"
+    - "cross-scope write violations"
+    - "main memory pollution"
+    - "agent reading scope A while exposing scope B content (read contamination)"
+    - "scope-recall router decision correctness"

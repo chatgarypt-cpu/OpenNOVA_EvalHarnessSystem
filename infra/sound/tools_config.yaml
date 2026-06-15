@@ -1,0 +1,37 @@
+# Tools Configuration
+#
+# 外置配置区，放 tools/ 下各脚本的可调参数。
+# 修改此文件后不需要重启——各工具每次读取最新值。
+#
+# 场景切换：改 profile 字段即可
+#   profile: public   → Glass 系统音效（工位/图书馆安全）
+#   profile: private  → 自定义梗音效（在家用）
+
+# 当前场景：public | private
+profile: private
+
+# ── Profile 定义 ─────────────────────────────────────────────
+profiles:
+  public:
+    heartbeat_sound: "Glass"
+    auto_mode_sound: "Glass"
+    crash_sound: "Glass"
+
+  private:
+    heartbeat_sound: "mission_complete.mp3"
+    auto_mode_sound: "movie_start.mp3"
+    crash_sound: "wasted.mp3"
+
+# ── Heartbeat Monitor ────────────────────────────────────────
+heartbeat_monitor:
+  sound: ""  # 留空 = 按 profile 自动选择
+  sound_dir: "tools/sounds/"
+
+  stale_threshold: 5      # 第一级：停这么久开始检查
+  stale_confirm: 10       # 第二级：二次确认后播报
+  poll_interval: 2.0
+
+# ── Dialog Watcher ───────────────────────────────────────────
+dialog_watcher:
+  auto_mode_sound: ""     # 留空 = 按 profile 自动选择
+  poll_interval: 0.5

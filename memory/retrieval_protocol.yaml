@@ -1,0 +1,99 @@
+# Adarian Memory Governance — retrieval_protocol.yaml
+# 用途：定义跨会话信息检索的分层路由规则与优先级
+# 版本：v2 (2026-05-29)
+# 触发条件：Hermes Agent 首次使用 session recall/scope recall 之前的决策路由
+#
+# 背景：Hermes v0.15.1 session_search 重构后，fast 模式（纯 FTS5，零 LLM）
+# 将检索成本从"每次调 LLM"降为"多数情况 0 token"。检索协议相应优化，
+# session_search(fast) 从最后手段升为第一级 fallback。
+
+retrieval_protocol:
+  version: 2
+  updated: "2026-05-29"
+  reason: >
+    Hermes v0.13.0 → v0.15.1 session_search 重构：
+    fast mode (FTS5 only, 0 LLM token) 可用，检索层次重新分级。
+
+  layers:
+    - priority: 1
+      name: "handoff"
+      tool: "handoff-writer.py / .session_handoff.md / 存档"
+      cost: "零"
+      use_case: "用户问'上次做了什么'、'继续之前的工作'、'当前状态'"
+      note: >
+        跨会话连续性第一入口。手写在会话结束或显式请求时写入，
+        存档位于 WorkflowBase/memory/handoffs/。
+        新会话自动通过 pre_llm_call hook (handoff-loader.py) 注入。
+
+        读完手写后，如果用户需求明确（如"继续做 X"），
+        不需要继续下滑检索。
+
+    - priority: 2
+      name: "session_search(fast)"
+      tool: "session_search_tool (mode=fast)"
+      cost: "0 LLM token (纯 FTS5)"
+      use_case: "handoff 未覆盖、实时状态、'我最近做过什么'、锚点定位"
+      note: >
+        v2 协议关键升级。fast 模式零 LLM 成本，应作为
+        handoff 未命中的第一 fallback。
+        适合快速快照检索（标题、会话列表、时间线）。
+        返回 match_message_id，支持锚点定位。
+
+    - priority: 3
+      name: "scope_recall (memory)"
+      tool: "scope_recall_search"
+      cost: "低 (本地 SQLite FTS5)"
+      use_case: "需要持久性事实 — 用户偏好、配置决策、
+                项目约定、反复纠正过的问题"
+      note: >
+        只存储你明确告诉它的事实。
+        适合确认性查询（"这个项目用什么框架？"）。
+
+    - priority: 4
+      name: "session_search(summary/guided)"
+      tool: "session_search_tool (mode=summary/guided)"
+      cost: "按 LLM token 计费"
+      use_case: "需要在不明确关键词时进行语义理解、
+                多锚点跨会话对比、
+                深层分析（'我们什么时候讨论过 X'）"
+      note: >
+        summary 模式使用 auxiliary LLM 总结匹配会话。
+        guided 模式支持 multi-anchor 钻取 + bookends（起止边界）。
+        仅在 fast 和 scope_recall 都无法满足时使用。
+
+  routing_rules:
+    - condition: "用户问'上轮做了什么'或提及已过的本工作区的会话"
+      action: "直接走 handoff → session_search(fast)"
+      stop_at: "命中手写内容或找到相关会话"
+
+    - condition: "需要确认具体事实（偏好、密码、配置值、项目约定）"
+      action: "走 scope_recall_search，不去查 session"
+      skip: "handoff 层（除非用户明确引用了手写内容）"
+
+    - condition: "引用或复述之前对话的内容，但无法通过 handoff 或 fast 定位"
+      action: "session_search(summary/guided)"
+      skip: "scope_recall（不存储对话原文）"
+
+    - condition: "用户明确说'搜一下对话记录'"  
+      action: "session_search(fast) 优先，不行再 summary"
+      note: "用户自己说搜记录 = 不绕 handoff 层"
+
+    - condition: "有明确 session_id 或 keywords"
+      action: "session_search(fast) 精确搜索"
+
+  forbidden:
+    - "同一轮中依次调用全部四个层次（浪费 token）"
+    - "在 handoff 命中后仍继续向下检索（除非 handoff 明显过期）"
+    - "用 session_search 替代 scope_recall 存持久性事实"
+
+  configuration:
+    auxiliary_session_search_default_mode: "fast"
+    config_path: "auxiliary.session_search.default_mode"
+    verification: >-
+      cat ~/.hermes/config.yaml | grep -A 10 'session_search:'
+      # 应包含: default_mode: fast
+
+  related_docs:
+    - "handoff_policy.yaml"
+    - "WorkflowBase/memory/handoffs/"
+    - "Hermes v0.15.1 session_search 重构 (commit abf1af540)"

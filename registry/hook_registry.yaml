@@ -1,0 +1,493 @@
+# Hook Registry R0.2
+# Adarian 系统已注册 hook + gate script 清单。
+# 分类说明：
+#   type: hook        — 通过 hermes config.yaml hooks.pre_llm_call 自动触发
+#   type: gate_script — "skill 写规则，script 做门"模式的手动调用脚本
+#   type: utility     — 被 gate_script 调用的辅助工具
+
+# ── Hermes Config Hooks（自动触发）───────────────────────────
+
+- id: hook-iteration-gate
+  name: Iteration Plan Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 自动扫描 ~/Downloads/ 新迭代计划文件 → 落盘到 docs/iterations/ → 审查计划结构/冲突 → 报告 readiness
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/iteration-gate.py
+  auto_accept: true
+  timeout_sec: 15
+  applicable_lanes: [A_LINE_FORMAL, WORKYB_RUNTIME]
+  inputs: [Downloads/ 新文件]
+  outputs: [gate result with recommended_next_skill]
+  allowed_paths: ["~/项目开发/**", "~/Downloads/**", "~/.hermes/scripts/**"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0, result structured]
+  features:
+    - auto_scan_downloads: true
+    - auto_land_plans: true
+    - conflict_detection: true
+    - next_skill_routing: true
+
+- id: hook-dispatch-approval-gate
+  name: Dispatch Approval Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 每次新 tmux dispatch 前的用户确认门 — 检测到 dispatch 意图时输出确认信号，等待 Owner 批准后才放行。已授权的 auto-retry 场景跳过。
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/dispatch-approval-gate.py
+  auto_accept: false
+  timeout_sec: 10
+  applicable_lanes: [A_LINE_FORMAL, WORKYB_RUNTIME]
+  inputs: [user message containing dispatch intent]
+  outputs: [approval request signal]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: true
+  validation: [exit code 0, status awaiting_approval]
+  features:
+    - dispatch_intent_detection: true
+    - owner_approval_required: true
+    - auto_retry_skip: true
+
+- id: hook-handoff-loader
+  name: Handoff Loader
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 新会话首条 LLM 调用前自动注入 .session_handoff.md 上下文
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/handoff-loader.py
+  auto_accept: true
+  timeout_sec: 10
+  applicable_lanes: [ALL]
+  inputs: [session start]
+  outputs: [injected context, session start timestamp]
+  allowed_paths: ["~/项目开发/**"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [handoff content injected, session start written]
+
+- id: hook-handoff-trigger
+  name: Handoff Trigger
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 每轮 LLM 调用前扫描用户消息中的会话结束关键词，匹配则触发 handoff 保存流程
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/handoff-trigger.py
+  auto_accept: true
+  timeout_sec: 10
+  applicable_lanes: [ALL]
+  inputs: [user message text]
+  outputs: [handoff trigger signal]
+  allowed_paths: ["~/项目开发/**"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]
+
+- id: hook-reality-review
+  name: Reality Review Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 检测用户消息中的 "reality review" 关键词，自动注入 workflow-reality-review skill 加载提醒 + agent-team 强制指令。不再指向 registry-reality-review（已拆为独立 skill）。
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/reality-review-hook.py
+  auto_accept: true
+  timeout_sec: 5
+  applicable_lanes: [A_LINE_FORMAL, WORKYB_RUNTIME]
+  inputs: [user message text]
+  outputs: [injected context with skill reminder]
+  allowed_paths: [\"~/项目开发/**\"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0, context injected when triggered]
+
+- id: hook-dispatch-preflight
+  name: Dispatch Preflight
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 派发前检查 task 目录和配置完整性 — 检查 task_dir/dispatch/task_config.yaml 字段完整性（task_id/executor_type/expected_outputs/prompt_file/workdir），防止从项目根裸跑留垃圾文件
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/dispatch-preflight-hook.py
+  auto_accept: true
+  timeout_sec: 10
+  applicable_lanes: [A_LINE_FORMAL, WORKYB_RUNTIME]
+  inputs: [user message containing dispatch intent or task path]
+  outputs: [preflight check failures or pass signal]
+  allowed_paths: [\"~/项目开发/**\"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]
+  features:
+    - task_dir_existence_check: true
+    - task_config_field_check: true
+    - executor_options_completeness: true
+    - workdir_project_root_check: true
+
+- id: hook-drift-check
+  name: Drift Check Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: Registry YAML 被修改后自动触发 drift_check — 检测未注册 skill/hook、路径不一致、schema 违规
+  hook_type: python_script
+  trigger: pre_llm_call
+  hook_path: /Users/gary/.hermes/scripts/drift-check-hook.py
+  auto_accept: true
+  timeout_sec: 30
+  applicable_lanes: [A_LINE_FORMAL]
+  allowed_paths: ["~/项目开发/**", "~/.hermes/**"]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+
+- id: hook-git
+  name: Git Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 拦截所有 git 写操作终端命令 — 检测 git checkout/reset/commit/add/push 等操作时 block，强制走 commit-gate 协议
+  hook_type: python_script
+  trigger: pre_tool_call
+  matcher: terminal
+  hook_path: /Users/gary/.hermes/scripts/git-hook.py
+  auto_accept: false
+  timeout_sec: 5
+  applicable_lanes: [ALL]
+  inputs: [terminal command containing git]
+  outputs: [block message with protocol reminder]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0, block when triggered]
+  features:
+    - git_write_operation_detection: true
+    - read_only_git_whitelist: true
+    - protocol_enforcement: true
+
+- id: hook-rm
+  name: RM Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: 拦截所有 rm/rm -rf/rmdir 终端命令 — 检测删除操作时 block，强制走归档流程（mv → Owner 确认 → 再决定是否删）
+  hook_type: python_script
+  trigger: pre_tool_call
+  matcher: terminal
+  hook_path: /Users/gary/.hermes/scripts/rm-hook.py
+  auto_accept: false
+  timeout_sec: 5
+  applicable_lanes: [ALL]
+  inputs: [terminal command containing rm/rmdir]
+  outputs: [block message with archive protocol]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0, block when triggered]
+  features:
+    - rm_detection: true
+    - archive_protocol_enforcement: true
+
+- id: hook-dataset-spec
+  name: Dataset Spec Gate
+  type: hook
+  status: active
+  version: '0.1'
+  purpose: write_file/patch 到 parser.py 或 dataset_fields.yaml 时，自动检查 dataset 字段是否全部标注在 spec 中。新增字段未更新 spec 则 block
+  hook_type: python_script
+  trigger: pre_tool_call
+  hook_path: /Users/gary/项目开发/AdarianMigration/adarian mvp/tools/dataset-spec-hook.py
+  auto_accept: true
+  timeout_sec: 15
+  applicable_lanes: [A_LINE_FORMAL]
+  allowed_paths: ["~/项目开发/AdarianMigration/adarian mvp/**"]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0, spec coverage check passed]
+  features:
+    - dataset_field_coverage_check: true
+    - spec_updated_before_code_change: true
+
+# ── Gate Scripts（手动调用，"skill 写规则，script 做门"）────
+
+- id: script-handoff-writer
+  name: Handoff Writer
+  type: gate_script
+  status: active
+  version: '0.1'
+  purpose: 写 .session_handoff.md 时的 record_protocol gate — 校验 stdin 中 record_protocol 存在性 + 枚举合法性，自动执行读旧→存档→合并→写新→时间戳全流程
+  script_type: pipe_gate
+  script_path: /Users/gary/.hermes/scripts/handoff-writer.py
+  auto_accept: false
+  call_pattern: 'cat content | python3 handoff-writer.py [--handoff-path PATH] [--replace]'
+  applicable_lanes: [ALL]
+  inputs: [stdin handoff content with record_protocol]
+  outputs: [.session_handoff.md, archive copy, update summary YAML]
+  allowed_paths: ["~/项目开发/**/.session_handoff.md", "~/项目开发/AdarianMigration/adarian mvp/WorkflowBase/memory/handoffs/"]
+  forbidden_paths: []
+  tools_required: [python3, pyyaml]
+  permission_level: write_within_scope
+  risk_level: medium
+  owner_approval_required: false
+  validation: [exit code 0, protocol_status ok, handoff file written]
+  depends_on: [script-session-end-stamp]
+  features:
+    - record_protocol_gate: true
+    - auto_archive: true
+    - auto_merge: true
+    - auto_timestamp: true
+
+- id: script-task-status-writer
+  name: Task Status Writer
+  type: gate_script
+  status: active
+  version: '0.1'
+  purpose: 写 task_status.yaml 时的 closeout 合规性校验门 — decided_by 不能是泛称/self-granted，必须有 decided_at + rationale
+  script_type: pipe_gate
+  script_path: /Users/gary/.hermes/scripts/task-status-writer.py
+  auto_accept: false
+  call_pattern: 'cat task_status.yaml | python3 task-status-writer.py --file task_status.yaml'
+  applicable_lanes: [WORKYB_RUNTIME, DOGFOOD_TEST]
+  inputs: [stdin task_status.yaml with closeout section, --file path]
+  outputs: [validated task_status.yaml]
+  allowed_paths: ["~/项目开发/AdarianMigration/adarian mvp/tasks/**/task_status.yaml"]
+  forbidden_paths: []
+  tools_required: [python3, pyyaml]
+  permission_level: write_within_scope
+  risk_level: medium
+  owner_approval_required: false
+  validation: [exit code 0, task_status.yaml written]
+  features:
+    - decided_by_validation: true
+    - self_granted_detection: true
+
+- id: script-dispatch-gate
+  name: Dispatch Gate
+  type: gate_script
+  status: active
+  version: '0.1'
+  purpose: 派发门 — 验证所有 dispatch 都走 relay runner，禁止手动创建 tmux session
+  script_type: validation_gate
+  script_path: /Users/gary/.hermes/scripts/dispatch-gate.py
+  auto_accept: false
+  applicable_lanes: [WORKYB_RUNTIME]
+  inputs: [task_dir, executor_type]
+  outputs: [gate pass/reject]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]
+
+- id: script-tmux-session-gate
+  name: Tmux Session Gate
+  type: gate_script
+  status: candidate
+  version: '0.1'
+  purpose: tmux session 管理门 — 验证 session 创建/清理合规性
+  script_type: validation_gate
+  script_path: /Users/gary/.hermes/scripts/tmux-session-gate.py
+  auto_accept: false
+  applicable_lanes: [WORKYB_RUNTIME]
+  inputs: [session name, action]
+  outputs: [gate pass/reject]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3, tmux]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]
+
+- id: script-commit-gate
+  name: Commit Gate
+  type: gate_script
+  status: active
+  version: '0.1'
+  purpose: git commit 前的人确认门 — 展示暂存文件、diff 统计、commit message，等待 Owner 批准后才执行实际 commit
+  script_type: approval_gate
+  script_path: /Users/gary/.hermes/scripts/commit-gate.py
+  auto_accept: false
+  call_pattern: 'python3 ~/.hermes/scripts/commit-gate.py "commit message"'
+  applicable_lanes: [WORKYB_RUNTIME, DOGFOOD_TEST]
+  inputs: [git diff --cached, commit message]
+  outputs: [gate display for human review]
+  allowed_paths: ["~/项目开发/**"]
+  forbidden_paths: []
+  tools_required: [git, python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: true
+  validation: [exit code 0]
+  features:
+    - staged_file_list: true
+    - diff_stat_display: true
+    - human_approval_required: true
+
+- id: script-promotion-gate
+  name: Promotion Gate
+  type: gate_script
+  status: active
+  version: '0.1'
+  purpose: B→A 资产 Promotion 的 Go1/Go2 阶段门 — 检查迭代计划落盘、阶段正确性、任务目录完整性，通过后才放行 dispatch
+  script_type: approval_gate
+  script_path: /Users/gary/.hermes/scripts/promotion-gate.py
+  auto_accept: false
+  call_pattern: 'python3 ~/.hermes/scripts/promotion-gate.py <go1|go2> [--plan-dir PATH]'
+  applicable_lanes: [A_LINE_FORMAL, WORKYB_RUNTIME]
+  inputs: [stage name, plan directory]
+  outputs: [gate display with 4 check items]
+  allowed_paths: ["~/项目开发/**"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: true
+  validation: [exit code 0, all 4 checks pass]
+  features:
+    - plan_existence_check: true
+    - conflict_task_check: true
+    - task_dir_integrity: true
+    - owner_approval_gate: true
+    - go1_go2_phase_control: true
+
+# ── Utilities（被 gate_script 调用的辅助工具）────────────────
+
+- id: script-session-end-stamp
+  name: Session End Stamp
+  type: utility
+  status: active
+  version: '0.1'
+  purpose: 写入 handoff 后自动打时间戳 — 从 ~/.hermes/.session_start 读取开始时间，记录结束时间，计算耗时，更新 handoff 头行
+  script_type: automaton
+  script_path: /Users/gary/.hermes/scripts/session-end-stamp.py
+  auto_accept: true
+  applicable_lanes: [ALL]
+  inputs: [handoff file path]
+  outputs: [handoff timestamp update, .session_end, .session_duration]
+  allowed_paths: ["~/项目开发/**/.session_handoff.md", "~/.hermes/.session_*"]
+  forbidden_paths: []
+  tools_required: [python3]
+  permission_level: write_within_scope
+  risk_level: low
+  owner_approval_required: false
+  validation: [timestamp written]
+  called_by: [script-handoff-writer]
+
+- id: script-heartbeat-monitor
+  name: Heartbeat Monitor
+  type: utility
+  status: active
+  version: '0.1'
+  purpose: 监控 relay runner 心跳信号 — 任务完成/失败/心跳冻结时自动播放通知音
+  script_type: utility
+  script_path: /Users/gary/项目开发/AdarianMigration/adarian mvp/WorkflowBase/infra/heartbeat_monitor.py
+  auto_accept: true
+  applicable_lanes: [A_LINE_FORMAL]
+  inputs: [task directory path]
+  outputs: [sound notification on completion]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3, afplay, tmux]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]
+
+- id: script-dialog-watcher
+  name: Dialog Watcher
+  type: utility
+  status: active
+  version: '0.1'
+  purpose: 监控 tmux 会话 — 自动批准权限弹窗 + 检测 idle at ❯ prompt + auto-mode 声音通知
+  script_type: utility
+  script_path: /Users/gary/项目开发/AdarianMigration/adarian mvp/WorkflowBase/registry/skills/dispatch-prompt-authoring/scripts/dialog_watcher.py
+  auto_accept: true
+  applicable_lanes: [A_LINE_FORMAL]
+  inputs: [tmux session id, task directory path]
+  outputs: [dialog approval, idle nudge, auto-mode notification]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3, tmux]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]
+
+- id: script-sound-utils
+  name: Sound Utilities
+  type: utility
+  status: active
+  version: '0.1'
+  purpose: 公共声音接口 — profile 路由（public/private）、多场景声音配置、与 heartbeat_monitor/dialog_watcher 集成
+  script_type: utility
+  script_path: /Users/gary/项目开发/AdarianMigration/adarian mvp/WorkflowBase/infra/sound/sound_utils.py
+  auto_accept: true
+  applicable_lanes: [A_LINE_FORMAL]
+  inputs: [sound event (completion, auto_mode, crash)]
+  outputs: [played sound]
+  allowed_paths: ["~/项目开发/AdarianMigration/adarian mvp/WorkflowBase/infra/sound/sounds/**"]
+  forbidden_paths: []
+  tools_required: [afplay]
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation: [sound plays]
+
+- id: script-power-switch
+  name: Power Switch
+  type: utility
+  status: active
+  version: '0.1'
+  purpose: 电池/电源管理 — Wake on LAN 开关、低功耗模式、合盖模式切换
+  script_type: utility
+  script_path: /Users/gary/.hermes/scripts/power-switch.py
+  auto_accept: true
+  applicable_lanes: [ALL]
+  inputs: [command (status/womp/lowpower/mode)]
+  outputs: [power state change]
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required: [python3, pmset]
+  permission_level: full
+  risk_level: low
+  owner_approval_required: false
+  validation: [exit code 0]

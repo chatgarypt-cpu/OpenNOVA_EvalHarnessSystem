@@ -1,0 +1,251 @@
+- id: executor-codex-tmux
+  name: Codex Tmux Executor
+  type: executor
+  status: active
+  purpose: 通过 tmux 交互式运行 Codex CLI，支持 /plan→/execute 两阶段模式 + Terminal observer window
+  executor_registry_name: codex-tmux
+  execution_model: tmux_interactive
+  module_path: WorkflowBase/runner/codex/tmux_executor.py
+  entry_class: CodexTmuxExecutor
+  applicable_lanes:
+  - A_LINE_FORMAL
+  - WORKYB_RUNTIME
+  - DOGFOOD_TEST
+  inputs:
+  - task_config with prompt
+  - executor_options.codex_context
+  outputs:
+  - RunResult with classification
+  - pane_capture
+  - receipt
+  - codex_handoff.md
+  allowed_paths:
+  - ~/项目开发/**
+  forbidden_paths:
+  - ~/.hermes/**
+  - ~/.cc-switch/**
+  tools_required:
+  - codex
+  - tmux
+  permission_level: write_within_scope
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - exit_code 0|5
+  - expected outputs present|missing
+  - codex_receipt.yaml present
+  - completion_markers detected
+  return_format: RunResult
+  evidence_paths:
+  - task_dir/runtime/result.json
+  - task_dir/logs/pane_capture.log
+  - task_dir/receipts/codex_receipt.yaml
+  - task_dir/codex/codex_handoff.md
+  - task_dir/runtime/result.yaml
+  features:
+  - observer_mode: true
+  - observer_attach: terminal_window
+  - two_phase_plan_execute: true
+  - codex_approver_daemon: true
+  - structured_blocker_classification: true
+  - completion_marker_detection: '[codex-agent: Session complete, Token usage regex]'
+  - dynamic_idle_timeout: true
+  - profile_aware_sound: true
+  - self_eat_verified: true
+  env_required:
+  - CODEX_AUTH (handled by codex login)
+  - HTTPS_PROXY (for sandbox connectivity)
+- id: executor-claude
+  name: Claude Tmux Executor
+  type: executor
+  status: active
+  purpose: 通过 tmux 交互式运行 Claude Code，支持 observer window
+  executor_registry_name: claude
+  execution_model: tmux_interactive
+  module_path: WorkflowBase/runner/claude/tmux_executor.py
+  entry_class: ClaudeTmuxExecutor
+  applicable_lanes:
+  - A_LINE_FORMAL
+  - WORKYB_RUNTIME
+  - DOGFOOD_TEST
+  inputs:
+  - task_config with prompt_file
+  outputs:
+  - RunResult with classification
+  - stdout
+  - stderr
+  allowed_paths:
+  - ~/项目开发/**
+  forbidden_paths: []
+  tools_required:
+  - claude
+  - tmux
+  permission_level: write_within_scope
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - exit_code 0
+  - expected outputs present
+  return_format: RunResult
+  evidence_paths:
+  - task_dir/runtime/result.json
+  - task_dir/logs/stdout.log
+  - task_dir/logs/pane_capture.log
+  features:
+  - observer_mode: true
+  - observer_attach: terminal_window
+  - clauderemote: true
+  - permission_human_takeover: true
+  - dialog_handling: true
+- id: executor-codex
+  name: Codex Subprocess Executor
+  type: executor
+  status: active
+  purpose: 通过 managed subprocess 运行 Codex CLI exec（one-shot 模式）
+  executor_registry_name: codex
+  execution_model: managed_subprocess
+  module_path: WorkflowBase/runner/codex/executor.py
+  entry_class: CodexExecutor
+  applicable_lanes:
+  - A_LINE_FORMAL
+  - B_LINE_LIGHTWEIGHT_DAG
+  - WORKYB_RUNTIME
+  - DOGFOOD_TEST
+  inputs:
+  - task_config with prompt_file or prompt
+  outputs:
+  - RunResult with JSONL stdout
+  - stderr
+  - classification
+  allowed_paths:
+  - ~/项目开发/**
+  forbidden_paths: []
+  tools_required:
+  - codex
+  permission_level: write_within_scope
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - exit_code 0
+  - JSONL valid
+  - expected outputs present
+  return_format: RunResult (JSONL stdout)
+  evidence_paths:
+  - task_dir/runtime/result.json
+  - task_dir/logs/stdout.log
+  - task_dir/logs/raw_output.jsonl
+  env_required:
+  - HTTPS_PROXY (for sandbox connectivity)
+- id: executor-fallback-subprocess
+  name: Generic Subprocess Executor
+  type: executor
+  status: active
+  purpose: 未注册 executor 类型的通用 subprocess 兜底
+  executor_registry_name: fallback-subprocess
+  execution_model: managed_subprocess
+  module_path: WorkflowBase/runner/relay_runner.py
+  entry_class: (inline — no dedicated class, handled in relay_runner managed_subprocess
+    branch)
+  applicable_lanes:
+  - ALL
+  inputs:
+  - task_config
+  - command
+  outputs:
+  - RunResult
+  allowed_paths:
+  - ~/项目开发/**
+  forbidden_paths:
+  - /etc/**
+  - ~/.ssh/**
+  - ~/Library/**
+  tools_required:
+  - command specified in config
+  permission_level: full
+  risk_level: high
+  owner_approval_required: true
+  validation:
+  - exit_code 0
+  - expected outputs present
+  return_format: RunResult
+  evidence_paths:
+  - task_dir/runtime/result.json
+  - task_dir/logs/stdout.log
+- id: resolver-path-resolver
+  name: Path Resolver
+  type: resolver
+  status: active
+  purpose: PM Runtime 路径防漂移模块 — 从单一 project_root 基址派生所有路径，校验存在性，生成缺失报告
+  module_path: WorkflowBase/runner/path_resolver.py
+  entry_class: ProjectPaths
+  applicable_lanes:
+  - ALL
+  inputs:
+  - project_root (default: auto-detect)
+  outputs:
+  - path resolution
+  - existence check
+  - missing report
+  allowed_paths:
+  - ~/项目开发/**
+  - ~/.hermes/**
+  - ~/Downloads/**
+  forbidden_paths: []
+  tools_required:
+  - python3
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation:
+  - exit code 0
+  - paths resolved correctly
+  features:
+  - single_root_derivation: true
+  - existence_validation: true
+  - migration_ready: true
+  - missing_report_generation: true
+- id: plugin-deepseek-thinking-fixer
+  name: DeepSeek Thinking Fixer
+  type: plugin
+  status: active
+  purpose: CC Switch DeepSeek thinking mode round-trip 修复插件
+  executor_registry_name: thinking-fixer
+  execution_model: http_proxy
+  module_path: WorkflowBase/registry/plugins/thinking-fixer/
+  entry_class: FixerServer
+  applicable_lanes:
+  - WORKYB_RUNTIME
+  inputs:
+  - HTTP requests from CC Switch → DeepSeek
+  outputs:
+  - fixed HTTP proxy responses
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required:
+  - python3
+  permission_level: full
+  risk_level: high
+  owner_approval_required: true
+  validation:
+  - proxy health check 200
+  return_format: HTTP proxy
+  evidence_paths: []
+- id: plugin-scope-recall
+  name: Scope Recall SQLite
+  type: plugin
+  status: active
+  purpose: Hermes scope_recall SQLite 数据库持久化与检索
+  executor_registry_name: scope-recall
+  execution_model: http_proxy
+  module_path: ~/.hermes/plugins/scope-recall/
+  entry_class: ScopeRecallPlugin
+  applicable_lanes:
+  - ALL
+  inputs:
+  - memory query
+  outputs:
+  - recalled memories
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  return_format: structured recall results

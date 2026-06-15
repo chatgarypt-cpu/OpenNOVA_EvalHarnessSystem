@@ -1,0 +1,83 @@
+# Adarian Memory Governance — handoff_policy.yaml
+# 用途：定义手记（handoff）的跨会话上下文通讯 + 历史存档规则
+# 定位：不是长期记忆，不是全局用户画像，不是聊天记录替代品
+
+handoff_policy:
+  purpose: "cross_session_continuity + historical_timeline"
+  not_purpose:
+    - "long_term_memory"
+    - "global_user_profile"
+    - "chat_log_replacement"
+
+  default_location_policy:
+    workspace_level: ".session_handoff.md"
+    complex_task_level: "WorkflowBase/memory/handoff/<task_id>.handoff.md"
+
+  read_rule:
+    - "At new session start, if user asks to continue prior work or gives no clear new task, load relevant handoff."
+    - "If multiple handoffs exist, select by current workspace and scope."
+    - "If uncertain, report candidate handoffs and ask Owner or HOLD."
+
+  write_rule:
+    - "Write or update handoff at session closeout or explicit Owner request."
+    - "Do not write trivial chat or emotional content into handoff."
+    - "Do not write unconfirmed agent assumptions into handoff as facts."
+    - "MANDATORY: Use handoff-writer.py (~/.hermes/scripts/handoff-writer.py) for ALL writes."
+    - "PROHIBITED: Direct write_file to .session_handoff.md — causes data loss."
+    - "AUTOMATIC: On every write, old handoff is archived to handoffs/ directory before merge."
+
+  required_fields:
+    - "handoff_id"
+    - "workspace"
+    - "project_id"
+    - "lane_id"
+    - "last_updated"
+    - "current_state"
+    - "last_completed"
+    - "pending_decisions"
+    - "blockers"
+    - "next_step"
+    - "do_not_infer"
+
+  recommended_fields:
+    - "required_context_files"
+    - "related_scopes"
+    - "owner_notes"
+
+  lifecycle:
+    # handoff 不过期。以下规则处理 handoff 的"活跃度"而非"删除"。
+    note: >
+      Ongoing handoffs (tasks still open) are never expired. They age in authority
+      but stay in place for continued tracking. Only completed/closed tasks get
+      archived. The snapshot archive in handoffs/ is a permanent timeline.
+
+    # Authority decay: ranks freshness for multi-handoff selection.
+    # Does NOT trigger archiving. Only affects which handoff is considered
+    # the "current authoritative state" when multiple exist.
+    freshness_decay:
+      enabled: true
+      after_days: 7
+      authority_penalty: 10
+      note: "authority drops from 80 to 70, same as scope memory; compare freshness"
+
+  archive_trigger: "task completion or explicit Owner instruction to close out"
+  archive_location: "WorkflowBase/memory/archive/"
+  archive_rule:
+    - "Only move to archive/ when task is completed and Owner confirms closeout."
+    - "Do NOT archive based on time alone. 7-day inactivity is a stale alert, not an expiry."
+    - "Ongoing handoffs stay in place. The snapshot archive (handoffs/) preserves every version as permanent timeline."
+
+  format_note: "Existing markdown handoff files remain valid. New handoffs may use YAML format with required_fields. Both formats coexist during migration."
+
+  cross_reference:
+    retrieval_protocol: "../retrieval_protocol.yaml"
+    note: "handoff 是检索协议的第一层（priority 1）。handoff 未命中时，路由到 session_search(fast, priority 2) 继续。"
+
+
+  # Handoff snapshots (every session write)
+  snapshot:
+    enabled: true
+    location: "WorkflowBase/memory/handoffs/"
+    naming: "YYYY-MM-DDTHH-MM-SS.md"
+    trigger: "every handoff write"
+    purpose: "preserve full handoff history for audit trail and disaster recovery"

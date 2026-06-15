@@ -1,0 +1,205 @@
+- id: mcp-brave
+  name: Brave Search
+  type: mcp
+  status: active
+  purpose: 本地搜索和网页搜索（Brave Search API）
+  transport: stdio
+  command: python3 /Users/gary/.hermes/brave-search-mcp.py
+  server_name: brave
+  tools_provided:
+  - brave_web_search
+  - brave_local_search
+  applicable_lanes:
+  - B_LINE_LIGHTWEIGHT_DAG
+  - COURSEWORK
+  - WORKYB_RUNTIME
+  inputs:
+  - search query
+  outputs:
+  - search results
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required:
+  - python3
+  permission_level: readonly
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - results returned
+  return_format: JSON
+  evidence_paths: []
+  env_required:
+  - BRAVE_API_KEY
+  - HTTP_PROXY
+- id: mcp-fetch
+  name: Fetch
+  type: mcp
+  status: active
+  purpose: 获取网页内容并提取为 Markdown
+  transport: stdio
+  command: uvx mcp-server-fetch
+  server_name: fetch
+  tools_provided:
+  - fetch
+  - get_prompt
+  - list_prompts
+  applicable_lanes:
+  - B_LINE_LIGHTWEIGHT_DAG
+  - COURSEWORK
+  - WORKYB_RUNTIME
+  inputs:
+  - URL
+  outputs:
+  - markdown content
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required:
+  - python3
+  permission_level: readonly
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - content returned
+  return_format: Markdown
+  evidence_paths: []
+- id: mcp-time
+  name: Time
+  type: mcp
+  status: active
+  purpose: 时间查询和时区转换
+  transport: stdio
+  command: uvx mcp-server-time --local-timezone Asia/Singapore
+  server_name: time
+  tools_provided:
+  - get_current_time
+  - convert_time
+  applicable_lanes:
+  - ALL
+  inputs:
+  - timezone
+  - time
+  outputs:
+  - time info
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required:
+  - python3
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  validation:
+  - time returned
+  return_format: structured time data
+  evidence_paths: []
+- id: mcp-zhipu
+  name: 智谱 AI Search
+  type: mcp
+  status: active
+  purpose: 智谱 AI 搜索引擎（中文搜索增强）
+  transport: stdio
+  command: uv --directory WorkflowBase/registry/mcp/zhipu run zhipu-mcp --stdio
+  server_name: zhipu
+  tools_provided:
+  - zhipu_web_search
+  applicable_lanes:
+  - B_LINE_LIGHTWEIGHT_DAG
+  - COURSEWORK
+  inputs:
+  - search query
+  outputs:
+  - search results
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required:
+  - python3
+  permission_level: readonly
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - results returned
+  return_format: JSON
+  evidence_paths: []
+  env_required:
+  - ZHIPU_API_KEY
+  - HTTP_PROXY
+  - HTTPS_PROXY
+- id: mcp-github
+  name: GitHub API
+  type: mcp
+  status: active
+  purpose: GitHub 仓库管理、Issue/PR/Code 操作
+  transport: stdio
+  command: npx -y @modelcontextprotocol/server-github
+  server_name: github
+  tools_provided:
+  - search_repositories
+  - get_file_contents
+  - create_issue
+  - list_pull_requests
+  applicable_lanes:
+  - ALL
+  inputs:
+  - GitHub query/command
+  outputs:
+  - GitHub data
+  allowed_paths: []
+  forbidden_paths: []
+  tools_required:
+  - npx
+  permission_level: write_within_scope
+  risk_level: medium
+  owner_approval_required: false
+  validation:
+  - API response returned
+  return_format: JSON
+  evidence_paths: []
+  env_required:
+  - GITHUB_PERSONAL_ACCESS_TOKEN
+- id: mcp-arxiv
+  name: arXiv 论文搜索
+  type: mcp
+  status: active
+  purpose: arXiv 论文检索、摘要获取、全文下载
+  transport: stdio
+  command: uvx arxiv-mcp-server
+  server_name: arxiv
+  tools_provided:
+  - arxiv_search
+  - arxiv_get_abstract
+  - arxiv_download_paper
+  applicable_lanes:
+  - ALL
+  inputs:
+  - search query
+  - paper ID
+  outputs:
+  - paper metadata
+  - full text
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  return_format: structured data
+- id: mcp-paper-search
+  name: Paper Search MCP
+  type: mcp
+  status: active
+  purpose: 论文搜索与引用分析（Semantic Scholar 后端）
+  transport: stdio
+  command: uvx paper-search-mcp
+  server_name: paper-search
+  tools_provided:
+  - search_papers
+  - get_citations
+  - get_references
+  applicable_lanes:
+  - ALL
+  inputs:
+  - search query
+  - paper ID
+  outputs:
+  - paper metadata
+  - citation graph
+  permission_level: readonly
+  risk_level: low
+  owner_approval_required: false
+  return_format: structured data

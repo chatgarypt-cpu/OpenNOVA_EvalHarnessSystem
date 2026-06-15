@@ -1,0 +1,65 @@
+# =============================================================================
+# Adarian Workflow v4.0 — Receipt Template
+# 来源: workflow_core_v4.0_r2.md §5.3
+# 用途: DS Team / Codex / PM Runtime 任务完成后回传，PM Runtime 回收校验
+# 原则: 没有回执不验收，没有真实产物路径不算完成
+# =============================================================================
+
+# ── 基础字段（所有执行者必填）──────────────────────────────────────────────
+
+task_id: ""               # 与 dispatch 一致
+task_title: ""            # 与 dispatch 一致
+executor: ""              # ds_team | codex | pm_runtime | external_agent
+
+started_at: ""            # ISO 时间戳，任务实际开始时间
+completed_at: ""          # ISO 时间戳，任务实际结束时间
+elapsed_sec: 0            # 实际耗时（秒）
+
+status: ""                # completed | failed | hold
+verdict: ""               # pass | pass_with_known_issues | fail | hold
+
+team_mode_used: ""        # true | false | N/A
+mcp_used: ""              # true | false | N/A
+
+# ── 产物清单（必须有真实文件路径）────────────────────────────────────────
+
+input_files:              # 任务读取的文件
+  - ""
+
+output_files:             # 任务产出的文件（必须列出路径，空路径 = 不算完成）
+  - ""
+
+modified_files:           # 任务修改的文件
+  - ""
+
+commands_run:             # 实际执行的命令
+  - ""
+
+# ── 问题与风险───────────────────────────────────────────────────────────
+
+known_issues:             # 已知问题
+  - ""
+
+blockers:                 # 阻塞项
+  - ""
+
+next_recommendation: ""   # 下一步建议（必填，hold 时尤其重要）
+
+# ── 可选补充字段─────────────────────────────────────────────────────────
+
+# report_path: ""         # 详细报告路径
+# receipt_path: ""        # 本回执文件路径
+# summary_path: ""        # 摘要文件路径
+# run_dir: ""             # 运行产物目录
+# diff_summary: ""        # git diff 摘要（Codex 必填）
+# process_issues:         # 流程问题
+#   - ""
+# recommended_commit_message: ""  # 建议的 commit message（Codex）
+
+# ── 校验规则（机器检查用，不是回执内容）───────────────────────────────────
+# 1. 如果 dispatch.team_mode_required == true 但 team_mode_used != true → 不得 clean pass
+# 2. 如果 dispatch.mcp_required == true 但 mcp_used != true → 需说明原因
+# 3. 如果 status == completed 但 output_files 为空 → 不算完成
+# 4. 如果 status == failed 但 blockers 和 known_issues 都为空 → 回执不完整
+# 5. 如果 status == hold 但 next_recommendation 为空 → 回执不完整
+# 6. 不得只写 "已完成" 或 "看起来没问题"，必须列出真实产物路径
