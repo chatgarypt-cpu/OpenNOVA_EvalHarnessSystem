@@ -1,8 +1,14 @@
-# OpenNOVA EvalHarnessSystem — 工作流 v4.3 现状描述
+# OpenNOVA Eval Harness
 
-> 当前范围：§0–§14
-> 状态：draft / 基于 v4.2 Reality Review + G1-G6 实现 + Control Agent 决策
-> 生成日期：2026-06-04
+OpenNOVA Eval Harness 是一个面向 AI Agent 长链路任务的工作流评估与治理系统，覆盖任务契约、运行调度、证据回收、产物校验与复盘收口，用于提升 Agent 应用交付的可控性、可验证性与可迭代性。
+
+## 核心能力
+
+- Task Contract：将模糊需求转化为明确的目标、边界与验收标准
+- Runtime Dispatch：支持不同执行器的任务分发与运行监控
+- Evidence Collection：回收 result、receipt、日志、heartbeat 等运行证据
+- Output Validation：基于 expected outputs 进行产物完整性校验
+- Closeout Review：通过复盘收口机制支持版本迭代与问题追踪
 
 ---
 
